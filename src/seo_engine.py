@@ -9,7 +9,7 @@ class SEOEngine:
     def __init__(self):
         self.hf_token = os.environ.get("HUGGINGFACE_API_KEY")
         self.client = InferenceClient(
-            model="Qwen/Qwen2.5-72B-Instruct",
+            model="Qwen/Qwen2.5-7B-Instruct",
             token=self.hf_token
         )
 

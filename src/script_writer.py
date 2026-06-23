@@ -12,7 +12,7 @@ class ScriptWriter:
             logging.warning("HUGGINGFACE_API_KEY not set. Script generation may fail.")
         # Using Qwen2.5-72B-Instruct as it's the latest flagship Qwen model usually available on HF Inference API
         self.client = InferenceClient(
-            model="Qwen/Qwen2.5-72B-Instruct",
+            model="Qwen/Qwen2.5-7B-Instruct",
             token=self.hf_token
         )
 
