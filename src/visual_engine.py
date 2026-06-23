@@ -22,30 +22,37 @@ class VisualEngine:
             
         payload = {"inputs": prompt, "parameters": {"num_inference_steps": 25, "guidance_scale": 7.5}}
         
-        try:
-            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=120)
-            if response.status_code == 200:
-                image = Image.open(io.BytesIO(response.content))
-                # Ensure 16:9 aspect ratio by cropping or generating at specific resolution if API supports it
-                # FLUX outputs 1024x1024 by default via standard HF API unless resolution is specified.
-                # Let's crop it to 16:9 (1024x576) for YouTube
-                width, height = image.size
-                new_height = int(width * (9/16))
-                top = (height - new_height) // 2
-                bottom = top + new_height
-                image = image.crop((0, top, width, bottom))
-                
-                image.save(output_path)
-                logging.info(f"Image saved to {output_path}")
-                return output_path
-            else:
-                logging.error(f"Image API Error: {response.status_code} - {response.text}")
-                self._create_placeholder(output_path)
-                return output_path
-        except Exception as e:
-            logging.error(f"Exception generating image: {e}")
-            self._create_placeholder(output_path)
-            return output_path
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=120)
+                if response.status_code == 200:
+                    image = Image.open(io.BytesIO(response.content))
+                    # Ensure 16:9 aspect ratio by cropping
+                    width, height = image.size
+                    new_height = int(width * (9/16))
+                    top = (height - new_height) // 2
+                    bottom = top + new_height
+                    image = image.crop((0, top, width, bottom))
+                    
+                    image.save(output_path)
+                    logging.info(f"Image saved to {output_path}")
+                    return output_path
+                else:
+                    logging.error(f"Attempt {attempt + 1} Image API Error: {response.status_code} - {response.text}")
+                    if attempt < max_retries - 1:
+                        time.sleep(10) # wait longer for image generation retries due to rate limits
+                    else:
+                        self._create_placeholder(output_path)
+                        return output_path
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1} Exception generating image: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(10)
+                else:
+                    self._create_placeholder(output_path)
+                    return output_path
 
     def _create_placeholder(self, output_path):
         # Create a black 1920x1080 image as fallback

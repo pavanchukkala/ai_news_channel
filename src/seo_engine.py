@@ -39,27 +39,34 @@ OUTPUT FORMAT (JSON ONLY):
 }}
 Ensure the output is valid JSON.
 """
-        try:
-            response = self.client.text_generation(
-                prompt,
-                max_new_tokens=1500,
-                temperature=0.7,
-                return_full_text=False
-            )
-            
-            cleaned_response = response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.text_generation(
+                    prompt,
+                    max_new_tokens=1500,
+                    temperature=0.7,
+                    return_full_text=False
+                )
                 
-            seo_data = json.loads(cleaned_response.strip())
-            logging.info("SEO metadata generated successfully.")
-            return seo_data
-            
-        except Exception as e:
-            logging.error(f"Failed to generate SEO: {e}")
-            return self._default_seo()
+                cleaned_response = response.strip()
+                if cleaned_response.startswith("```json"):
+                    cleaned_response = cleaned_response[7:]
+                if cleaned_response.endswith("```"):
+                    cleaned_response = cleaned_response[:-3]
+                    
+                seo_data = json.loads(cleaned_response.strip())
+                logging.info("SEO metadata generated successfully.")
+                return seo_data
+                
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1} failed to generate SEO: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                else:
+                    logging.error("Max retries reached. Using default SEO data.")
+                    return self._default_seo()
 
     def _default_seo(self):
         return {

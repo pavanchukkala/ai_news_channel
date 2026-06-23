@@ -50,28 +50,35 @@ OUTPUT FORMAT (JSON ONLY):
 }}
 Ensure the output is valid JSON.
 """
-        try:
-            response = self.client.text_generation(
-                prompt,
-                max_new_tokens=4000,
-                temperature=0.7,
-                return_full_text=False
-            )
-            
-            # Clean up potential markdown formatting in JSON response
-            cleaned_response = response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.text_generation(
+                    prompt,
+                    max_new_tokens=4000,
+                    temperature=0.7,
+                    return_full_text=False
+                )
                 
-            script_data = json.loads(cleaned_response.strip())
-            logging.info(f"Successfully generated script with {len(script_data.get('scenes', []))} scenes.")
-            return script_data
-            
-        except Exception as e:
-            logging.error(f"Failed to generate script: {e}")
-            raise
+                # Clean up potential markdown formatting in JSON response
+                cleaned_response = response.strip()
+                if cleaned_response.startswith("```json"):
+                    cleaned_response = cleaned_response[7:]
+                if cleaned_response.endswith("```"):
+                    cleaned_response = cleaned_response[:-3]
+                    
+                script_data = json.loads(cleaned_response.strip())
+                logging.info(f"Successfully generated script with {len(script_data.get('scenes', []))} scenes.")
+                return script_data
+                
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1} failed to generate script: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5) # wait before retrying
+                else:
+                    logging.error("Max retries reached. Failing.")
+                    raise
 
 if __name__ == "__main__":
     writer = ScriptWriter()

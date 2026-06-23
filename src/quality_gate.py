@@ -40,30 +40,37 @@ OUTPUT FORMAT (JSON ONLY):
 }}
 Ensure output is valid JSON.
 """
-        try:
-            response = self.client.text_generation(
-                prompt,
-                max_new_tokens=500,
-                temperature=0.3,
-                return_full_text=False
-            )
-            
-            cleaned = response.strip()
-            if cleaned.startswith("```json"): cleaned = cleaned[7:]
-            if cleaned.endswith("```"): cleaned = cleaned[:-3]
+        import time
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.text_generation(
+                    prompt,
+                    max_new_tokens=500,
+                    temperature=0.3,
+                    return_full_text=False
+                )
                 
-            result = json.loads(cleaned.strip())
-            
-            if result.get("approved"):
-                logging.info(f"Quality Gate PASSED: {result.get('reason')}")
-                return True
-            else:
-                logging.error(f"Quality Gate FAILED: {result.get('reason')}")
-                return False
+                cleaned = response.strip()
+                if cleaned.startswith("```json"): cleaned = cleaned[7:]
+                if cleaned.endswith("```"): cleaned = cleaned[:-3]
+                    
+                result = json.loads(cleaned.strip())
                 
-        except Exception as e:
-            logging.error(f"Quality gate error (failing open): {e}")
-            return True # Fail open to prevent pipeline crash on simple LLM JSON format errors
+                if result.get("approved"):
+                    logging.info(f"Quality Gate PASSED: {result.get('reason')}")
+                    return True
+                else:
+                    logging.error(f"Quality Gate FAILED: {result.get('reason')}")
+                    return False
+                    
+            except Exception as e:
+                logging.error(f"Attempt {attempt + 1} Quality gate error: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                else:
+                    logging.error("Max retries reached. Failing open to prevent pipeline crash.")
+                    return True
 
 if __name__ == "__main__":
     gate = QualityGate()
