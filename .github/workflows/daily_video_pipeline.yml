@@ -1,0 +1,61 @@
+name: Daily AI News Video Pipeline
+
+on:
+  schedule:
+    # Run everyday at 8:00 AM UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allow manual triggers for testing
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Install System Dependencies (FFmpeg & Espeak)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg espeak-ng
+
+    - name: Install Python Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Cache Kokoro ONNX Model
+      id: cache-kokoro
+      uses: actions/cache@v3
+      with:
+        path: |
+          kokoro-v0_19.onnx
+          voices.json
+        key: ${{ runner.os }}-kokoro-v1
+
+    - name: Download Kokoro ONNX Model (If not cached)
+      if: steps.cache-kokoro.outputs.cache-hit != 'true'
+      run: |
+        wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
+        wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json
+
+    - name: Run Pipeline
+      env:
+        HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+        YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+        YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      run: |
+        python src/main.py
+
+    - name: Upload Logs on Failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: output-files
+        path: output/
