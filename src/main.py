@@ -1,4 +1,14 @@
 import os
+# Force HF Inference Endpoint to use the router
+os.environ["HF_INFERENCE_ENDPOINT"] = "https://router.huggingface.co"
+
+# Globally disable IPv6 for urllib3 to prevent NameResolutionError on environments with broken IPv6 DNS lookup
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except ImportError:
+    pass
+
 import sys
 import logging
 from news_fetcher import NewsFetcher

@@ -1,17 +1,25 @@
 import os
-import requests
+# Force HF Inference Endpoint to use the router
+os.environ["HF_INFERENCE_ENDPOINT"] = "https://router.huggingface.co"
+
+# Globally disable IPv6 for urllib3 to prevent NameResolutionError on environments with broken IPv6 DNS lookup
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except ImportError:
+    pass
+
 import logging
 from PIL import Image
 import io
+from huggingface_hub import InferenceClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class VisualEngine:
     def __init__(self):
         self.hf_token = os.environ.get("HUGGINGFACE_API_KEY")
-        # Using FLUX.1-schnell or dev depending on API availability/speed
-        self.api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
-        self.headers = {"Authorization": f"Bearer {self.hf_token}"}
+        self.client = InferenceClient(token=self.hf_token)
         
     def generate_image(self, prompt, output_path):
         logging.info(f"Generating image for prompt: {prompt[:50]}...")
@@ -20,32 +28,23 @@ class VisualEngine:
             self._create_placeholder(output_path)
             return output_path
             
-        payload = {"inputs": prompt, "parameters": {"num_inference_steps": 25, "guidance_scale": 7.5}}
-        
         import time
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=120)
-                if response.status_code == 200:
-                    image = Image.open(io.BytesIO(response.content))
-                    # Ensure 16:9 aspect ratio by cropping
-                    width, height = image.size
-                    new_height = int(width * (9/16))
-                    top = (height - new_height) // 2
-                    bottom = top + new_height
-                    image = image.crop((0, top, width, bottom))
-                    
-                    image.save(output_path)
-                    logging.info(f"Image saved to {output_path}")
-                    return output_path
-                else:
-                    logging.error(f"Attempt {attempt + 1} Image API Error: {response.status_code} - {response.text}")
-                    if attempt < max_retries - 1:
-                        time.sleep(10) # wait longer for image generation retries due to rate limits
-                    else:
-                        self._create_placeholder(output_path)
-                        return output_path
+                # Use client.text_to_image which routes correctly
+                image = self.client.text_to_image(prompt, model="black-forest-labs/FLUX.1-dev")
+                
+                # Ensure 16:9 aspect ratio by cropping
+                width, height = image.size
+                new_height = int(width * (9/16))
+                top = (height - new_height) // 2
+                bottom = top + new_height
+                image = image.crop((0, top, width, bottom))
+                
+                image.save(output_path)
+                logging.info(f"Image saved to {output_path}")
+                return output_path
             except Exception as e:
                 logging.error(f"Attempt {attempt + 1} Exception generating image: {e}")
                 if attempt < max_retries - 1:

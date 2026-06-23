@@ -1,4 +1,14 @@
 import os
+# Force HF Inference Endpoint to use the router
+os.environ["HF_INFERENCE_ENDPOINT"] = "https://router.huggingface.co"
+
+# Globally disable IPv6 for urllib3 to prevent NameResolutionError on environments with broken IPv6 DNS lookup
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except ImportError:
+    pass
+
 import json
 import logging
 from huggingface_hub import InferenceClient
@@ -54,15 +64,16 @@ Ensure the output is valid JSON.
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = self.client.text_generation(
-                    prompt,
-                    max_new_tokens=4000,
-                    temperature=0.7,
-                    return_full_text=False
+                response = self.client.chat.completions.create(
+                    model="Qwen/Qwen2.5-7B-Instruct",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=4000,
+                    temperature=0.7
                 )
+                text_content = response.choices[0].message.content
                 
                 # Clean up potential markdown formatting in JSON response
-                cleaned_response = response.strip()
+                cleaned_response = text_content.strip()
                 if cleaned_response.startswith("```json"):
                     cleaned_response = cleaned_response[7:]
                 if cleaned_response.endswith("```"):

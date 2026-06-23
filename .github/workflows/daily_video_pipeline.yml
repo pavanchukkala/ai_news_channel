@@ -44,10 +44,10 @@ jobs:
         wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx
         wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json
 
-    - name: Fix DNS Resolution
+    - name: Disable IPv6
       run: |
-        sudo sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
-        sudo sh -c 'echo "nameserver 1.1.1.1" >> /etc/resolv.conf'
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
     - name: Run Pipeline
       env:
@@ -55,6 +55,7 @@ jobs:
         YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
         YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
         YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        HF_INFERENCE_ENDPOINT: https://router.huggingface.co
       run: |
         python src/main.py
 
